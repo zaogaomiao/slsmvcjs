@@ -1,0 +1,80 @@
+﻿@using slsjs.Models.FileModel
+
+@model FBase
+
+@{
+    ViewBag.Title = "目录展示测试";
+    string root_dir_json = Newtonsoft.Json.JsonConvert.SerializeObject(Model);
+}
+@section custom_script{
+    @*@Scripts.Render("~/Costom/js_iframe_fix")*@
+    @Scripts.Render("~/bundles/vue")
+}
+@section scripts{
+    <script>
+        // 这段代码是在文档之后执行的
+        window.mydata = {};
+        window.mydata.root_dir = {
+            root: @(Html.Raw(root_dir_json))
+        };
+    </script>
+    @Scripts.Render("~/scripts/dirtest")
+}
+<h2>目录展示测试</h2>
+<div id="file-list">
+    <my-filetree v-bind:fitem="root"></my-filetree>
+</div>
+<div id="vue-template-1" class="vue-template-define" style="display:none">
+    @* 组织一个树形结构 *@
+    <div data-template-name="my-filetree" data-template-props="fitem">
+        <div class="node-line">
+            <my-dirline v-if="fitem.ftype === 'dir'" v-bind:ditem="fitem"></my-dirline>
+            <div v-if="fitem.isloading">正在加载……</div>
+            <div class="dir-children" v-if="fitem.children && fitem.children.length>0">
+                <my-filetree v-for="(f, idx) in fitem.children" v-bind:key="idx" v-bind:fitem="f"></my-filetree>
+            </div>
+            <my-fileline v-else-if="fitem.ftype === 'file'" v-bind:fitem="fitem"></my-fileline>
+        </div>
+    </div>
+    @* 一个文件夹的视图 *@
+    <div data-template-name="my-dirline" data-template-props="ditem">
+        <div class="dir-line">
+            <span class="glyphicon glyphicon-folder-open" v-on:click="load_dir(ditem.fdir, ditem, $event)" style="cursor:pointer"> </span>&nbsp;
+            <span>{{ ditem.name }}</span>
+        </div>
+    </div>
+    @* 一个文件的视图 *@
+    <div data-template-name="my-fileline" data-template-props="fitem">
+        <div class="file-line">
+            <span class="glyphicon glyphicon-file"> </span>&nbsp;
+            <span>{{ fitem.name }}&nbsp;-&nbsp;length:&nbsp;{{ fitem.length}}</span>
+        </div>
+    </div>
+</div>
+
+
+@section custom_style{
+    <style>
+        .dir-children {
+            padding-left: 16px;
+            border-width: 1px 0px 0px 1px;
+            border-color: #eee;
+            border-style: solid;
+        }
+
+        .dir-line {
+            /*background-color: #ffe;*/
+        }
+
+        .file-line {
+        }
+
+        .dir-line:hover {
+            background-color: #ffffe0;
+        }
+
+        .file-line:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+}

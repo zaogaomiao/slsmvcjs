@@ -1,0 +1,186 @@
+﻿@using slsjs.Models.FileModel
+
+@model FBase
+
+@{
+    ViewBag.Title = "文件浏览器";
+    string root_dir_json = Newtonsoft.Json.JsonConvert.SerializeObject(Model);
+}
+@section custom_script{
+    @Scripts.Render("~/bundles/vue")
+}
+@section scripts{
+    <script>
+    (function () {
+        // 这段代码是在文档之后执行的
+        var root_dir = @(Html.Raw(root_dir_json));
+        //
+        var s_to_e = function (sdata) {
+            // 分解文件夹的全路径
+            var dir_levels = sdata.fdir.split("\\");
+            return {
+                name: sdata.name,
+                dirs: dir_levels,
+                items: sdata.children
+            };
+        };
+        //
+        var explorer_data = s_to_e(root_dir);
+
+        var vm = new Vue({
+            el: "#explorer_body",
+            data: {
+                isloading: false, // 是否正在加载中
+                show_type: "list",
+                select_one: null, // 选中的一项
+                edata: explorer_data
+            },
+            methods: {
+                loaddir_byidx: function (idx, event) {
+                    if (!this.isloading) { // 在非加载中时才读取文件
+                        // 文件夹全路径
+                        var fulldir = this.edata.dirs.splice(0, idx+1).join("\\");
+                        //alert(fulldir);
+                        load_dir(fulldir);
+                    }
+                },
+                loaddir_byfull: function (fulldir, event) {
+                    if (!this.isloading) {
+                        load_dir(fulldir);
+                    }
+                },
+                set_show_type: function (st) {
+                    this.show_type = st;
+                },
+                click_one: function (x) {
+                    vm.select_one = x;
+                }
+            }
+        });
+        var load_dir = function (fulldir) {
+            $.ajax({
+                url: "/VueTest/DirTestGet",
+                context: vm,
+                data: { dir: fulldir },
+                dataType: "json",
+                method: "post",
+                beforeSend: function () { this.isloading = true; },
+                complete: function () { this.isloading = false; },
+                success: function (data, textStatus, jqXHR) {
+                    this.edata = s_to_e(data);
+                }
+            });
+        };
+        $(document).ready(function () {
+            //load_dir("d://");
+        });
+    })();
+    </script>
+}
+@section custom_style{
+    <style>
+        .explorer_icon_node {
+            text-align: center;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+            .explorer_icon_node:hover {
+                background-color: #eaf9ff;
+            }
+
+        .dir_icon {
+            color: #ffd800;
+            text-shadow: 0px 0px 1px rgba(0, 0, 0, 0.34);
+        }
+
+        .file_icon {
+            color: #f8f8f8;
+            text-shadow: 0px 0px 1px rgba(0, 0, 0, 0.34);
+        }
+    </style>
+}
+
+<h2>文件浏览器</h2>
+<div id="explorer_body">
+    <div id="explorer_title">
+        <h3>{{edata.name}}</h3>
+    </div>
+    <div id="explorer_bar" class="clearfix">
+        <div class="col-xs-10">
+            <ol class="breadcrumb">
+                <li v-for="(ditem, idx) in edata.dirs">
+                    <a href="#" v-if="edata.dirs.length>1 && idx<edata.dirs.length-1" v-on:click="loaddir_byidx(idx, $event)">{{ditem}}</a>
+                    <span v-else>{{ditem}}</span>
+                </li>
+            </ol>
+        </div>
+        <div class="col-xs-2">
+            <div class="btn-group">
+                <button type="button" class="btn btn-default" v-on:click="set_show_type('list')"><span class="glyphicon glyphicon-list"> </span></button>
+                <button type="button" class="btn btn-default" v-on:click="set_show_type('icon')"><span class="glyphicon glyphicon-th"> </span></button>
+            </div>
+        </div>
+    </div>
+    <div id="explorer_filelist">
+        <template v-if="show_type==='list'">
+            <table id="explorer_list_frame" class="table table-hover">
+                <thead>
+                    <tr>
+                        <th title="序号">#</th>
+                        <th>文件名</th>
+                        <th>属性</th>
+                        <th>创建时间</th>
+                        <th>访问时间</th>
+                        <th>修改时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(fitem, idx) in edata.items">
+                        <td>{{idx}}</td>
+                        <td>
+                            <template v-if="fitem.ftype==='dir'">
+                                <span class="dir_icon glyphicon glyphicon-folder-close"></span>
+                                <a href="#" v-on:click="loaddir_byfull(fitem.fdir, $event)">{{fitem.name}}</a>
+                            </template>
+                            <template v-if="fitem.ftype==='file'">
+                                <span class="file_icon glyphicon glyphicon-file"></span>
+                                <span>{{fitem.name}}</span>
+                            </template>
+                        </td>
+                        <td>{{fitem.attr}}</td>
+                        <td>{{fitem.ctime}}</td>
+                        <td>{{fitem.latime}}</td>
+                        <td>{{fitem.lwtime}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </template>
+        <template v-if="show_type==='icon'">
+            <div id="explorer_icon_frame">
+                <template v-for="(fitem, idx) in edata.items">
+                    <div class="explorer_icon_node col-xs-2" v-on:click="click_one(fitem)">
+                        <template v-if="fitem.ftype==='dir'">
+                            <div><span class="dir_icon glyphicon glyphicon-folder-close" style="font-size:3em;"></span></div>
+                            <div><a href="#" v-on:click="loaddir_byfull(fitem.fdir, $event)">{{fitem.name}}</a></div>
+                        </template>
+                        <template v-if="fitem.ftype==='file'">
+                            <div><span class="file_icon glyphicon glyphicon-file" style="font-size:3em;"></span></div>
+                            <div><span>{{fitem.name}}</span></div>
+                        </template>
+                    </div>
+                    <div class="clearfix" v-if="idx%6==5"></div>
+                </template>
+            </div>
+            <div class="clearfix"></div>
+            <div class="explorer_icon_msgbar">
+                <template v-if="select_one">
+                    <div class="col-xs-4"><span>创建时间：</span><span>{{select_one.ctime}}</span></div>
+                    <div class="col-xs-4"><span>访问时间：</span><span>{{select_one.latime}}</span></div>
+                    <div class="col-xs-4"><span>修改时间：</span><span>{{select_one.lwtime}}</span></div>
+                </template>
+                <div class="clearfix"></div>
+            </div>
+        </template>
+    </div>
+</div>

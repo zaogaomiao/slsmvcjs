@@ -1,0 +1,160 @@
+﻿@using slsjs.Models.Formula
+
+@model FormulaLocal
+
+@{
+    ViewBag.Title = "Formula";
+}
+@section custom_script{
+    @Scripts.Render("~/bundles/vue")
+}
+@section scripts{
+    <script>
+        $(document).ready(function () {
+            $(window).resize(function () {
+                var f_all_h = $(window).height();
+                var f_head_h = $("body>.navbar").outerHeight(true) + $("#formula-head").outerHeight(true);
+                var f_food_h = $("body>.container>footer").outerHeight(true) + $("body>.container>hr").outerHeight(true);
+                $("#formula-work").css({
+                    height: f_all_h - f_head_h - f_food_h - 10
+                });
+            });
+            $(window).resize();
+        });
+    </script>
+    @Scripts.Render("~/scripts/formula-test")
+}
+@section custom_style{
+    <style>
+        .fml_block {
+            display: inline-block;
+            padding: 3px;
+            border: 1px solid #c0c0c0;
+            position: relative;
+        }
+
+            .fml_block.edit {
+                border: 1px solid #9a0000;
+            }
+
+        .fml_table {
+            border: none;
+            border-collapse: collapse;
+        }
+
+        .fml_editor {
+            /*display: none;*/
+            position: absolute;
+            top: 100%;
+            left: 0px;
+            width: 500px;
+            z-index: 3;
+        }
+
+        .fix-height {
+            height: 100%;
+            overflow: auto;
+            position: relative;
+        }
+    </style>
+}
+
+<div id="formula-root" class="row">
+    <div id="formula-head" class="row">
+        <h2>
+            数学公式
+            <div id="action_area" class="pull-right">
+                @* 操作区域 *@
+                <div class="btn-toolbar">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-success" v-on:click="fml_read" v-bind:disabled="reading">读取</button>
+                        <button type="button" class="btn btn-primary" v-on:click="fml_save" v-bind:disabled="saving">保存</button>
+                    </div>
+                </div>
+            </div>
+        </h2>
+    </div>
+    <div id="formula-work" class="row">
+        <div id="formula-left" class="fix-height col-xs-3">
+            @* 变量录入区域 *@
+            <ul class="nav nav-pills">
+                <li class="active"><a href="#">属性</a></li>
+                <li><a href="#">参数</a></li>
+            </ul>
+            <div id="argu-area" class="hidden"></div>
+            <formula-editor v-if="edit_item" v-bind:item="edit_item"></formula-editor>
+        </div>
+        <div id="formula-right" class="fix-height col-xs-9">
+            @* 算式显示区域 *@
+            <ul class="nav nav-pills">
+                <li class="active"><a href="#">算式</a></li>
+            </ul>
+            <div style="position: absolute; top: 50px; right: 15px; left: 15px; bottom: 0px; background-color: #eee; overflow: auto;padding: 3px;">
+                <formula-item v-bind:item="formula"></formula-item>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+@* 定义公式使用到的模板 *@
+<script type="text/x-template" id="formula-item">
+    <div class="fml_block" v-bind:class="{edit: isEdit}">
+        <div class="fml_show" v-on:click.stop="set_edit">
+            <div class="fml_div" v-if="struct.frame==='div'">
+                <span v-if="item.ftype==='value'">{{item.value}}</span>
+                <span v-else-if="item.ftype==='argu'">{{item.name}}</span>
+            </div>
+            <table class="fml_table" v-else-if="struct.frame==='table'">
+                <tbody>
+                    @*纵向*@
+                    <template v-if="struct.direction==='v'">
+                        <template v-for="idx in (struct.count<0 ? item.argus.length : struct.count)">
+                            <tr v-if="idx>1"><td v-html="operator">@*间隔符*@</td></tr>
+                            <tr><td><formula-item v-bind:item="item.argus[idx-1]"></formula-item></td></tr> @*子算式*@
+                        </template>
+                    </template>
+                    @*横向*@
+                    <tr v-else-if="struct.direction==='h'">
+                        <template v-for="idx in (struct.count<0 ? item.argus.length : struct.count)">
+                            <td v-if="idx>1" v-html="operator">@*间隔符*@</td>
+                            <td><formula-item v-bind:item="item.argus[idx-1]"></formula-item></td> @*子算式*@
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</script>
+<script type="text/x-template" id="formula-editor">
+    <div id="formula-edit">
+        <div class="form-group">
+            <label for="fml_ftype" class="control-label">类型</label>
+            <select id="fml_ftype" class="form-control" v-model="item.ftype">
+                <option v-for="typeitem in types" v-bind:value="typeitem.key">{{typeitem.title}}</option>
+            </select>
+        </div>
+        <div class="form-group" v-if="item.ftype==='value'">
+            <label for="fml_value" class="control-label">数值</label>
+            <input id="fml_value" class="form-control" v-model.number="item.value"></input>
+        </div>
+        <div class="form-group" v-if="item.ftype==='argu'">
+            <label for="fml_argu" class="control-label">变量</label>
+            <input id="fml_argu" class="form-control" v-model="item.name"></input>
+        </div>
+        <div class="form-group" v-if="struct.count<0">
+            <label class="control-label">参数</label>
+            <ul class="list-group">
+                <template v-if="item.argus">
+                    <li class="list-group-item" v-for="(argu_item, idx) in item.argus">
+                        <span class="badge" title="删除" v-on:click="item.argus.splice(idx, 1)"><span class="glyphicon glyphicon-remove"> </span></span>
+                        参数 {{idx+1}}
+                    </li>
+                </template>
+                <li class="list-group-item">
+                    <button class="btn btn-success btn-xs" v-on:click="argu_add">添加</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+</script>
